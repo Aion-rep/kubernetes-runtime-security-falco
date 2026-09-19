@@ -80,9 +80,28 @@ Prometheus TSDB
 Grafana
 ```
 
-## Why the existing Prometheus stack was reused
+## Prometheus and Grafana monitoring stack
 
-The cluster already had `kube-prometheus-stack`. Reusing it avoided duplicate Prometheus/Grafana installations, wasted resources, extra datasources, and unnecessary operational complexity.
+For this project, `kube-prometheus-stack` was installed in the `monitoring` namespace to provide Prometheus, Grafana, and Prometheus Operator resources.
+
+Once the stack was running, Falco was integrated into the same monitoring platform instead of deploying a separate monitoring stack specifically for Falco.
+
+This kept the architecture simple:
+
+```text
+Falco
+  |
+  v
+falco-metrics Service
+  |
+  v
+ServiceMonitor
+  |
+  v
+kube-prometheus-stack Prometheus
+  |
+  v
+Grafana
 
 The Falco ServiceMonitor carries:
 
@@ -91,6 +110,7 @@ release: kube-prometheus-stack
 ```
 
 because the existing Prometheus instance selects ServiceMonitors using that label.
+This allowed Falco metrics to be discovered and scraped by the Prometheus stack already deployed for this project.
 
 ## Why `falco-exporter` was not used
 
