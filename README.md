@@ -208,7 +208,7 @@ metrics:
 
 Falco exposes `/metrics` on TCP `8765`.
 
-The existing Prometheus stack discovers Falco through:
+The Prometheus stack discovers Falco through:
 
 ```yaml
 serviceMonitor:
@@ -261,7 +261,7 @@ The dashboard is stored in:
 grafana/falco-runtime-security-dashboard.yaml
 ```
 
-The existing Grafana sidecar watches ConfigMaps labeled:
+The Grafana sidecar watches ConfigMaps labeled:
 
 ```yaml
 grafana_dashboard: "1"
@@ -438,7 +438,7 @@ This project only references `harbor-secret` by name.
 - dedicated pull-only Harbor robot account
 - native Falco Prometheus metrics
 - ServiceMonitor integration
-- existing kube-prometheus-stack reused
+- kube-prometheus-stack
 - Grafana dashboard managed as code
 - 3 representative detections verified end-to-end
 - false-positive tuning completed
