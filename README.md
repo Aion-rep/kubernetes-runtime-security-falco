@@ -30,7 +30,7 @@ The objective was to build a complete runtime-security workflow rather than only
 | Falco Helm chart | `9.1.0` |
 | Driver | `modern_ebpf` |
 | Registry | `repo.fiberathome.cloud` |
-| Monitoring | existing `kube-prometheus-stack` |
+| Monitoring | `kube-prometheus-stack` |
 
 > Cilium and Falco both use eBPF, but for different purposes. Cilium uses it primarily for networking and policy; Falco uses it for runtime event visibility.
 
