@@ -1,0 +1,24 @@
+# Upstream Helm charts kept locally, not committed
+falco/
+kube-prometheus-stack/
+
+# Downloaded Helm archives
+*.tgz
+
+# Temporary rendered manifests
+/tmp/
+*.tmp
+
+# Kubernetes / registry secrets
+*secret*.yaml
+*secret*.yml
+*.dockerconfigjson
+
+# Local editor files
+*.swp
+*~
+.vscode/
+.idea/
+
+# OS files
+.DS_Store

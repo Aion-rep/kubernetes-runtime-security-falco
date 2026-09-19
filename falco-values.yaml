@@ -1,0 +1,243 @@
+metrics:
+  enabled: true
+  interval: 15s
+  rulesCountersEnabled: true
+  service:
+    create: true
+
+serviceMonitor:
+  create: true
+  labels:
+    release: kube-prometheus-stack
+  interval: 15s
+  scrapeTimeout: 10s
+  endpointPort: "metrics"
+
+image:
+  registry: repo.fiberathome.cloud
+  repository: falco/falco
+  tag: "0.44.1"
+
+imagePullSecrets:
+  - name: harbor-secret
+
+driver:
+  enabled: true
+  kind: modern_ebpf
+
+controller:
+  kind: daemonset
+
+customRules:
+  runtime-security-rules.yaml: |-
+    - rule: Custom Interactive Shell in Container
+      desc: Detect an interactive shell started inside a container
+      condition: >
+        evt.type in (execve, execveat) and
+        container.id != host and
+        proc.tty != 0 and
+        proc.name in (bash, sh, zsh, ash, dash, ksh)
+      output: >
+        Interactive shell started in container
+        (user=%user.name command=%proc.cmdline container=%container.name
+        image=%container.image.repository pod=%k8s.pod.name
+        namespace=%k8s.ns.name)
+      priority: WARNING
+      tags: [container, shell, runtime-security, custom]
+
+    - rule: Custom Sensitive Credential File Read in Container
+      desc: Detect reads of sensitive credential files from inside a container
+      condition: >
+        open_read and
+        container.id != host and
+        (
+          fd.name = /etc/shadow or
+          fd.name contains "/.ssh/id_rsa" or
+          fd.name contains "/.ssh/id_ed25519" or
+          (
+            fd.name contains "/var/run/secrets/kubernetes.io/serviceaccount/token" and
+            (
+              proc.name in (shell_binaries) or
+              proc.name in (cat, less, more, head, tail, grep, awk, sed,
+                            curl, wget, python, python3, perl, ruby)
+            )
+          )
+        )
+      output: >
+        Sensitive credential file read in container
+        (user=%user.name process=%proc.name command=%proc.cmdline
+        file=%fd.name container=%container.name
+        image=%container.image.repository pod=%k8s.pod.name
+        namespace=%k8s.ns.name)
+      priority: WARNING
+      tags: [container, filesystem, credential-access, runtime-security, custom]
+
+    - rule: Custom Privilege Changing Tool in Container
+      desc: Detect execution of tools commonly used to change user or privilege context inside a container
+      condition: >
+        spawned_process and
+        container.id != host and
+        proc.name in (userexec_binaries)
+      output: >
+        Privilege-changing tool executed in container
+        (user=%user.name process=%proc.name command=%proc.cmdline
+        parent=%proc.pname container=%container.name
+        image=%container.image.repository pod=%k8s.pod.name
+        namespace=%k8s.ns.name)
+      priority: WARNING
+      tags: [container, privilege-escalation, process, runtime-security, custom]
+    - rule: Custom Namespace Manipulation Tool in Container
+      desc: Detect execution of tools commonly used to enter or create Linux namespaces from inside a container
+      condition: >
+        spawned_process and
+        container.id != host and
+        proc.name in (nsenter, unshare)
+      output: >
+        Namespace manipulation tool executed in container
+        (user=%user.name process=%proc.name command=%proc.cmdline
+        parent=%proc.pname container=%container.name
+        image=%container.image.repository pod=%k8s.pod.name
+        namespace=%k8s.ns.name)
+      priority: WARNING
+      tags: [container, namespace, escape, runtime-security, custom]
+
+    - rule: Custom Container Runtime Socket Access
+      desc: Detect a process inside a container connecting to Docker or containerd runtime sockets
+      condition: >
+        evt.type = connect and
+        container.id != host and
+        (
+          fd.name contains "/var/run/docker.sock" or
+          fd.name contains "/run/docker.sock" or
+          fd.name contains "/run/containerd/containerd.sock" or
+          fd.name contains "/var/run/containerd/containerd.sock"
+        )
+      output: >
+        Container runtime socket accessed from container
+        (user=%user.name process=%proc.name command=%proc.cmdline
+        socket=%fd.name container=%container.name
+        image=%container.image.repository pod=%k8s.pod.name
+        namespace=%k8s.ns.name)
+      priority: CRITICAL
+      tags: [container, runtime-socket, escape, runtime-security, custom]
+
+    - rule: Custom Suspicious Network Tool in Container
+      desc: Detect execution of common network reconnaissance and reverse shell utilities inside a container
+      condition: >
+        spawned_process and
+        container.id != host and
+        proc.name in (nc, ncat, netcat, socat, nmap, masscan, telnet, netstat, ss)
+      output: >
+        Suspicious network tool executed in container
+        (user=%user.name process=%proc.name command=%proc.cmdline
+        parent=%proc.pname container=%container.name
+        image=%container.image.repository pod=%k8s.pod.name
+        namespace=%k8s.ns.name)
+      priority: WARNING
+      tags: [container, network, reconnaissance, runtime-security, custom]
+
+    - rule: Custom Download Piped to Shell
+      desc: Detect curl or wget commands piped directly into a shell inside a container
+      condition: >
+        spawned_process and
+        container.id != host and
+        proc.name in (shell_binaries) and
+        (
+          proc.cmdline contains "curl " or
+          proc.cmdline contains "wget "
+        ) and
+        (
+          proc.cmdline contains "| sh" or
+          proc.cmdline contains "|sh" or
+          proc.cmdline contains "| bash" or
+          proc.cmdline contains "|bash"
+        )
+      output: >
+        Download command piped to shell in container
+        (user=%user.name process=%proc.name command=%proc.cmdline
+        container=%container.name image=%container.image.repository
+        pod=%k8s.pod.name namespace=%k8s.ns.name)
+      priority: CRITICAL
+      tags: [container, execution, download-execute, runtime-security, custom]
+
+    - rule: Custom SSH Private Key Access in Container
+      desc: Detect reads of SSH private keys or authorized keys from inside a container
+      condition: >
+        open_read and
+        container.id != host and
+        (
+          fd.name contains "/.ssh/id_rsa" or
+          fd.name contains "/.ssh/id_ed25519" or
+          fd.name contains "/.ssh/id_ecdsa" or
+          fd.name contains "/.ssh/id_dsa" or
+          fd.name contains "/.ssh/authorized_keys"
+        )
+      output: >
+        SSH credential file accessed in container
+        (user=%user.name process=%proc.name command=%proc.cmdline
+        file=%fd.name container=%container.name
+        image=%container.image.repository pod=%k8s.pod.name
+        namespace=%k8s.ns.name)
+      priority: WARNING
+      tags: [container, ssh, credential-access, runtime-security, custom]
+
+    - rule: Custom Kubectl Executed in Container
+      desc: Detect execution of kubectl from inside a container
+      condition: >
+        spawned_process and
+        container.id != host and
+        (
+          proc.name = kubectl or
+          proc.exepath endswith "/kubectl"
+        )
+      output: >
+        kubectl executed inside container
+        (user=%user.name process=%proc.name command=%proc.cmdline
+        parent=%proc.pname container=%container.name
+        image=%container.image.repository pod=%k8s.pod.name
+        namespace=%k8s.ns.name)
+      priority: WARNING
+      tags: [container, kubernetes, credential-access, runtime-security, custom]
+    - rule: Custom Suspicious System Modification or Temp Execution
+      desc: Detect sensitive system configuration writes or execution from temporary and memory-backed filesystems inside containers
+      condition: >
+        container.id != host and
+        (
+          (
+            open_write and
+            (
+              fd.name startswith "/etc/" or
+              fd.name startswith "/proc/sys/" or
+              fd.name startswith "/var/spool/cron/" or
+              fd.name startswith "/etc/cron." or
+              fd.name = /etc/crontab
+            ) and
+            not (
+              proc.exe = /bin/prometheus-config-reloader and
+              k8s.ns.name = monitoring and
+              (
+                fd.name startswith "/etc/prometheus/config_out/" or
+                fd.name startswith "/etc/alertmanager/config_out/"
+              )
+            )
+          ) or
+          (
+            spawned_process and
+            (
+              proc.exe startswith "/tmp/" or
+              proc.exe startswith "/dev/shm/" or
+              proc.exe startswith "/run/shm/"
+            )
+          )
+        )
+      output: >
+        Suspicious system modification or temporary filesystem execution
+        (user=%user.name process=%proc.name command=%proc.cmdline
+        file=%fd.name executable=%proc.exe container=%container.name
+        image=%container.image.repository pod=%k8s.pod.name
+        namespace=%k8s.ns.name)
+      priority: WARNING
+      tags: [container, persistence, execution, filesystem, runtime-security, custom]
+
+falco:
+  rule_matching: all
