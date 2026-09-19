@@ -12,7 +12,7 @@ The objective was to build a complete runtime-security workflow rather than only
 - create and tune 10 custom runtime rules
 - safely trigger representative detections
 - expose Falco's native Prometheus metrics
-- reuse the existing kube-prometheus-stack
+- use kube-prometheus-stack for Prometheus and Grafana monitoring
 - provision a Grafana dashboard as code
 - document troubleshooting and false-positive tuning
 
